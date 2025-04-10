@@ -27,6 +27,7 @@ class Project:
 
     mypy_cmd: str
     pyright_cmd: str | None
+    pyrefly_cmd: str | None
 
     install_cmd: str | None = None
     deps: list[str] | None = None
@@ -35,6 +36,7 @@ class Project:
     # if expected_success, there is a recent version of mypy which passes cleanly
     expected_mypy_success: bool = False
     expected_pyright_success: bool = False
+    expected_pyrefly_success: bool = False
 
     # cost is vaguely proportional to type check time
     # for mypy we use the compiled times
@@ -284,6 +286,41 @@ class Project:
             pyright_cmd, output, not bool(proc.returncode), self.expected_pyright_success, runtime
         )
 
+    def get_pyrefly_cmd(self, pyrefly: Path, additional_flags: Sequence[str] = ()) -> str:
+        pyrefly_cmd = self.pyrefly_cmd or "{pyrefly}"
+        assert "{pyrefly}" in pyrefly_cmd
+        if additional_flags:
+            pyrefly_cmd += " " + " ".join(additional_flags)
+        pyrefly_cmd = pyrefly_cmd.format(pyrefly=f"{pyrefly}")
+        return pyrefly_cmd
+
+    async def run_pyrefly(
+        self, pyrefly: Path, typeshed_dir: Path | None, prepend_path: Path | None
+    ) -> TypeCheckResult:
+        env = os.environ.copy()
+        additional_flags = ctx.get().additional_flags.copy()
+        if typeshed_dir is not None:
+            additional_flags.append(f"--typeshedpath {quote_path(typeshed_dir)}")
+        if prepend_path is not None:
+            env["MYPY_PRIMER_PREPEND_PATH"] = str(prepend_path)
+        pyrefly_cmd = self.get_pyrefly_cmd(pyrefly, additional_flags)
+        pyrefly_cmd = f"{self.venv.activate_cmd}; {pyrefly_cmd} check"
+        proc, runtime = await run(
+            pyrefly_cmd,
+            shell=True,
+            output=True,
+            check=False,
+            cwd=ctx.get().projects_dir / self.name,
+            env=env,
+        )
+        if ctx.get().debug:
+            debug_print(f"{Style.BLUE}{pyrefly} on {self.name} took {runtime:.2f}s{Style.RESET}")
+
+        output = proc.stderr + proc.stdout
+        return TypeCheckResult(
+            pyrefly_cmd, output, not bool(proc.returncode), self.expected_pyrefly_success, runtime
+        )
+
     async def run_typechecker(
         self, type_checker: Path, typeshed_dir: Path | None, *, prepend_path: Path | None
     ) -> TypeCheckResult:
@@ -291,6 +328,8 @@ class Project:
             return await self.run_mypy(type_checker, typeshed_dir, prepend_path)
         elif ctx.get().type_checker == "pyright":
             return await self.run_pyright(type_checker, typeshed_dir, prepend_path)
+        elif ctx.get().type_checker == "pyrefly":
+            return await self.run_pyrefly(type_checker, typeshed_dir, prepend_path)
         else:
             raise ValueError(f"Unknown type checker: {ctx.get().type_checker}")
 
@@ -341,7 +380,7 @@ for source in sources:
                 if header.startswith("# flags:"):
                     additional_flags = header[len("# flags:") :]
         return Project(
-            location=location, mypy_cmd=f"{{mypy}} {location} {additional_flags}", pyright_cmd=None
+            location=location, mypy_cmd=f"{{mypy}} {location} {additional_flags}", pyright_cmd=None, pyrefly_cmd=None,
         )
 
 

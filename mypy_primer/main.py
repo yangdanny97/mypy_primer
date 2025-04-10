@@ -18,7 +18,7 @@ from mypy_primer.git_utils import (
 from mypy_primer.globals import ctx, parse_options_and_set_ctx
 from mypy_primer.model import Project, TypeCheckResult
 from mypy_primer.projects import get_projects
-from mypy_primer.type_checker import setup_mypy, setup_pyright, setup_typeshed
+from mypy_primer.type_checker import setup_mypy, setup_pyrefly, setup_pyright, setup_typeshed
 from mypy_primer.utils import Style, debug_print, get_npm, line_count, run, strip_colour_code
 
 T = TypeVar("T")
@@ -80,6 +80,28 @@ async def setup_new_and_old_pyright(
     return new_pyright, old_pyright
 
 
+async def setup_new_and_old_pyrefly(
+    new_pyrefly_revision: RevisionLike,
+    old_pyrefly_revision: RevisionLike,
+    debug: bool
+) -> tuple[Path, Path]:
+    new_pyrefly, old_pyrefly = await asyncio.gather(
+        setup_pyrefly(
+            ctx.get().base_dir / "new_pyrefly",
+            new_pyrefly_revision,
+            repo=ctx.get().repo,
+            debug=debug
+        ),
+        setup_pyrefly(
+            ctx.get().base_dir / "old_pyrefly",
+            old_pyrefly_revision,
+            repo=ctx.get().repo,
+            debug=debug
+        ),
+    )
+    return new_pyrefly, old_pyrefly
+
+
 async def setup_new_and_old_typeshed(
     new_typeshed_revision: RevisionLike, old_typeshed_revision: RevisionLike
 ) -> tuple[Path | None, Path | None]:
@@ -119,6 +141,8 @@ def select_projects() -> list[Project]:
     )
     if ARGS.type_checker == "pyright":
         project_iter = iter(p for p in project_iter if p.pyright_cmd is not None)
+    if ARGS.type_checker == "pyrefly":
+        project_iter = iter(p for p in project_iter if p.pyrefly_cmd is not None)
     if ARGS.project_selector:
         project_iter = iter(
             p for p in project_iter if re.search(ARGS.project_selector, p.location, flags=re.I)
@@ -225,6 +249,13 @@ async def measure_project_runtimes() -> None:
             ARGS.base_dir / "timer_pyright",
             ARGS.new,
             repo=ARGS.repo,
+        )
+    elif ARGS.type_checker == "pyrefly":
+        type_checker_exe = await setup_pyrefly(
+            ARGS.base_dir / "timer_pyrefly",
+            ARGS.new,
+            repo=ARGS.repo,
+            debug=ARGS.debug
         )
     else:
         raise ValueError(f"Unknown type checker {ARGS.type_checker}")
@@ -389,6 +420,12 @@ async def primer() -> int:
         new_type_checker, old_type_checker = await setup_new_and_old_pyright(
             new_pyright_revision=ARGS.new,
             old_pyright_revision=revision_or_recent_tag_fn(ARGS.old),
+        )
+    elif ARGS.type_checker == "pyrefly":
+        new_type_checker, old_type_checker = await setup_new_and_old_pyrefly(
+            new_pyrefly_revision=ARGS.new,
+            old_pyrefly_revision=revision_or_recent_tag_fn(ARGS.old),
+            debug=ARGS.debug
         )
     else:
         raise ValueError(f"Unknown type checker {ARGS.type_checker}")
