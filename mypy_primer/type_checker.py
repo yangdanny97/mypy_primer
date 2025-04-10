@@ -105,19 +105,15 @@ async def setup_pyrefly(
     revision_like: RevisionLike,
     *,
     repo: str | None,
-    debug: bool
 ) -> Path:
     pyright_dir.mkdir(exist_ok=True)
 
     if repo is None:
         repo = "https://github.com/facebook/pyrefly"
     repo_dir = await ensure_repo_at_revision(repo, pyright_dir, revision_like)
-    cmd = ["cargo", "build"]
-    if not debug:
-        cmd.append("--release")
+    cmd = ["cargo", "build", "--release"]
     await run(cmd, cwd=repo_dir / "pyrefly")
-    target_dir = "debug" if debug else "release"
-    return repo_dir / "pyrefly" / "target" / target_dir / "pyrefly"
+    return repo_dir / "pyrefly" / "target" / "release" / "pyrefly"
 
 
 async def setup_typeshed(parent_dir: Path, *, repo: str, revision_like: RevisionLike) -> Path:

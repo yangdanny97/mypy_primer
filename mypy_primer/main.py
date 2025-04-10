@@ -83,20 +83,17 @@ async def setup_new_and_old_pyright(
 async def setup_new_and_old_pyrefly(
     new_pyrefly_revision: RevisionLike,
     old_pyrefly_revision: RevisionLike,
-    debug: bool
 ) -> tuple[Path, Path]:
     new_pyrefly, old_pyrefly = await asyncio.gather(
         setup_pyrefly(
             ctx.get().base_dir / "new_pyrefly",
             new_pyrefly_revision,
             repo=ctx.get().repo,
-            debug=debug
         ),
         setup_pyrefly(
             ctx.get().base_dir / "old_pyrefly",
             old_pyrefly_revision,
             repo=ctx.get().repo,
-            debug=debug
         ),
     )
     return new_pyrefly, old_pyrefly
@@ -255,7 +252,6 @@ async def measure_project_runtimes() -> None:
             ARGS.base_dir / "timer_pyrefly",
             ARGS.new,
             repo=ARGS.repo,
-            debug=ARGS.debug
         )
     else:
         raise ValueError(f"Unknown type checker {ARGS.type_checker}")
@@ -425,7 +421,6 @@ async def primer() -> int:
         new_type_checker, old_type_checker = await setup_new_and_old_pyrefly(
             new_pyrefly_revision=ARGS.new,
             old_pyrefly_revision=revision_or_recent_tag_fn(ARGS.old),
-            debug=ARGS.debug
         )
     else:
         raise ValueError(f"Unknown type checker {ARGS.type_checker}")

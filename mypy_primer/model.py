@@ -300,11 +300,13 @@ class Project:
         env = os.environ.copy()
         additional_flags = ctx.get().additional_flags.copy()
         if typeshed_dir is not None:
-            additional_flags.append(f"--typeshedpath {quote_path(typeshed_dir)}")
+            additional_flags.append(f"--typeshed {quote_path(typeshed_dir)}")
         if prepend_path is not None:
             env["MYPY_PRIMER_PREPEND_PATH"] = str(prepend_path)
+        with open(ctx.get().projects_dir / self.name / "pyre_config.toml", "w") as f:
+            f.write("errors = {import-error = false, missing-module-attribute = false}\n")
         pyrefly_cmd = self.get_pyrefly_cmd(pyrefly, additional_flags)
-        pyrefly_cmd = f"{self.venv.activate_cmd}; {pyrefly_cmd} check"
+        pyrefly_cmd = f"{self.venv.activate_cmd}; {pyrefly_cmd}"
         proc, runtime = await run(
             pyrefly_cmd,
             shell=True,
@@ -315,7 +317,6 @@ class Project:
         )
         if ctx.get().debug:
             debug_print(f"{Style.BLUE}{pyrefly} on {self.name} took {runtime:.2f}s{Style.RESET}")
-
         output = proc.stderr + proc.stdout
         return TypeCheckResult(
             pyrefly_cmd, output, not bool(proc.returncode), self.expected_pyrefly_success, runtime
